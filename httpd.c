@@ -22,12 +22,12 @@
 #include <strings.h>
 #include <string.h>
 #include <sys/stat.h>
-#include <pthread.h>
+//#include <pthread.h>
 #include <sys/wait.h>
 #include <stdlib.h>
 #include <stdint.h>
 
-#define ISspace(x) isspace((int)(x))
+#define ISspace(x) isspace((int)(x)) //int isspace(int) A C library function
 
 #define SERVER_STRING "Server: jdbhttpd/0.1.0\r\n"
 #define STDIN   0
@@ -78,6 +78,7 @@ void accept_request(void *arg)
 
     if (strcasecmp(method, "GET") && strcasecmp(method, "POST"))
     {
+        //only `GET` and `POST`　methods are implemented
         unimplemented(client);
         return;
     }
@@ -197,7 +198,7 @@ void cannot_execute(int client)
 /**********************************************************************/
 void error_die(const char *sc)
 {
-    perror(sc);
+    perror(sc); // A C library function, print a system error message
     exit(1);
 }
 
@@ -229,6 +230,7 @@ void execute_cgi(int client, const char *path,
         numchars = get_line(client, buf, sizeof(buf));
         while ((numchars > 0) && strcmp("\n", buf))
         {
+            //handle headers
             buf[15] = '\0';
             if (strcasecmp(buf, "Content-Length:") == 0)
                 content_length = atoi(&(buf[16]));
@@ -244,6 +246,9 @@ void execute_cgi(int client, const char *path,
     }
 
 
+    //creates a pipe, a unidirectional data channel that can be use for inter process communication.
+    //[0] read end
+    //[1] write end
     if (pipe(cgi_output) < 0) {
         cannot_execute(client);
         return;
@@ -270,7 +275,7 @@ void execute_cgi(int client, const char *path,
         close(cgi_output[0]);
         close(cgi_input[1]);
         sprintf(meth_env, "REQUEST_METHOD=%s", method);
-        putenv(meth_env);
+        putenv(meth_env); //change the value of environment variables
         if (strcasecmp(method, "GET") == 0) {
             sprintf(query_env, "QUERY_STRING=%s", query_string);
             putenv(query_env);
@@ -325,6 +330,12 @@ int get_line(int sock, char *buf, int size)
         {
             if (c == '\r')
             {
+                /*
+                 * MSG_PEEK
+                 * Peeks at an incoming message.
+                 * The data is treated as unread and the next recv()
+                 * or similar function shall still return this data.
+                 */
                 n = recv(sock, &c, 1, MSG_PEEK);
                 /* DEBUG printf("%02X\n", c); */
                 if ((n > 0) && (c == '\n'))
@@ -430,24 +441,48 @@ int startup(u_short *port)
 {
     int httpd = 0;
     int on = 1;
+    /*
+     * struct sockaddr_in{
+     *     sa_family_t sin_family; // address family
+     *     in_port_t sin_port; // port in network byte order
+     *     struct in_addr sin_addr; // internet address
+     * }
+     *
+     * struct in_addr{
+     *     uint32_t s_addr; //address in network byte order
+     * }
+     *
+     */
     struct sockaddr_in name;
 
+    /*
+     * @param domain    IPv4 Internet protocols
+     * @param type    Provides sequenced, reliable, two-way, connection-
+     *                based byte streams.  An out-of-band data transmission
+     *                mechanism may be supported.
+     * @param protocol    The caller does not want to specify the protocol
+     *                    and will leave it up to the service provider
+     */
     httpd = socket(PF_INET, SOCK_STREAM, 0);
     if (httpd == -1)
         error_die("socket");
-    memset(&name, 0, sizeof(name));
+    memset(&name, 0, sizeof(name)); //set memory of `name` to 0
     name.sin_family = AF_INET;
     name.sin_port = htons(*port);
     name.sin_addr.s_addr = htonl(INADDR_ANY);
+    //?
     if ((setsockopt(httpd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on))) < 0)  
     {  
         error_die("setsockopt failed");
     }
+    //?
     if (bind(httpd, (struct sockaddr *)&name, sizeof(name)) < 0)
         error_die("bind");
     if (*port == 0)  /* if dynamically allocating a port */
     {
         socklen_t namelen = sizeof(name);
+
+        //returns the current address to which the socket httpd is bound
         if (getsockname(httpd, (struct sockaddr *)&name, &namelen) == -1)
             error_die("getsockname");
         *port = ntohs(name.sin_port);
@@ -493,21 +528,26 @@ int main(void)
     int client_sock = -1;
     struct sockaddr_in client_name;
     socklen_t  client_name_len = sizeof(client_name);
-    pthread_t newthread;
+    //pthread_t newthread;
 
     server_sock = startup(&port);
     printf("httpd running on port %d\n", port);
 
     while (1)
     {
+        //client_name is filled with the address of the peer socket
+        //client_name_len - the caller must initialize it to contain the size (int bytes) of the structure pointed to by @client_name
+        //                - on return it will contain the actual size of the peer address
         client_sock = accept(server_sock,
                 (struct sockaddr *)&client_name,
                 &client_name_len);
         if (client_sock == -1)
             error_die("accept");
-        /* accept_request(&client_sock); */
+        accept_request(&client_sock);
+        /*
         if (pthread_create(&newthread , NULL, (void *)accept_request, (void *)&client_sock) != 0)
             perror("pthread_create");
+        */
     }
 
     close(server_sock);
