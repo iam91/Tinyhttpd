@@ -270,6 +270,8 @@ void execute_cgi(int client, const char *path,
         char query_env[255];
         char length_env[255];
 
+        printf("Child process pid: %d\n", getpid());
+
         dup2(cgi_output[1], STDOUT);
         dup2(cgi_input[0], STDIN);
         close(cgi_output[0]);
@@ -287,6 +289,8 @@ void execute_cgi(int client, const char *path,
         execl(path, NULL);
         exit(0);
     } else {    /* parent */
+        printf("Parent process pid: %d\n", getpid());
+
         close(cgi_output[1]);
         close(cgi_input[0]);
         if (strcasecmp(method, "POST") == 0)
@@ -299,6 +303,7 @@ void execute_cgi(int client, const char *path,
 
         close(cgi_output[0]);
         close(cgi_input[1]);
+
         waitpid(pid, &status, 0);
     }
 }
@@ -405,7 +410,7 @@ void not_found(int client)
 /* Send a regular file to the client.  Use headers, and report
  * errors to client if they occur.
  * Parameters: a pointer to a file structure produced from the socket
- *              file descriptor
+ *             file descriptor
  *             the name of the file to serve */
 /**********************************************************************/
 void serve_file(int client, const char *filename)
