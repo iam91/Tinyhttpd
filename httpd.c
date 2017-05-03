@@ -66,7 +66,10 @@ void accept_request(void *arg)
                        * program */
     char *query_string = NULL;
 
+    printf("before get_line\n");
     numchars = get_line(client, buf, sizeof(buf));
+    printf("after get_line %d\n", numchars);
+
     i = 0; j = 0;
     while (!ISspace(buf[i]) && (i < sizeof(method) - 1))
     {
@@ -198,6 +201,7 @@ void cannot_execute(int client)
 /**********************************************************************/
 void error_die(const char *sc)
 {
+    printf("%s\n", sc);
     perror(sc); // A C library function, print a system error message
     exit(1);
 }
@@ -330,6 +334,8 @@ int get_line(int sock, char *buf, int size)
     while ((i < size - 1) && (c != '\n'))
     {
         n = recv(sock, &c, 1, 0);
+        printf("\n");
+        printf("%c", &c);
         /* DEBUG printf("%02X\n", c); */
         if (n > 0)
         {
@@ -355,6 +361,8 @@ int get_line(int sock, char *buf, int size)
             c = '\n';
     }
     buf[i] = '\0';
+
+    printf("\n\n");
 
     return(i);
 }
@@ -476,8 +484,8 @@ int startup(u_short *port)
     name.sin_port = htons(*port);
     name.sin_addr.s_addr = htonl(INADDR_ANY);
     //?
-    if ((setsockopt(httpd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on))) < 0)  
-    {  
+    if ((setsockopt(httpd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on))) < 0)
+    {
         error_die("setsockopt failed");
     }
     //?
@@ -536,7 +544,7 @@ int main(void)
     //pthread_t newthread;
 
     server_sock = startup(&port);
-    printf("httpd running on port %d\n", port);
+    printf("Start running: httpd running on port %d\n", port);
 
     while (1)
     {
@@ -546,8 +554,10 @@ int main(void)
         client_sock = accept(server_sock,
                 (struct sockaddr *)&client_name,
                 &client_name_len);
+        printf("after accept\n");
         if (client_sock == -1)
             error_die("accept");
+        printf("before accept_request\n");
         accept_request(&client_sock);
         /*
         if (pthread_create(&newthread , NULL, (void *)accept_request, (void *)&client_sock) != 0)
